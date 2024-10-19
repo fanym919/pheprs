@@ -1,38 +1,46 @@
 import pathlib
 
+from paillier_lib.partialenc import *
+
 # get current directory of this file
 cwd = pathlib.Path(__file__).parent.resolve()
 
-encrypted_data = {}
-encrypted_client = []
+ENCRYPTED_DATA = {}
+ENCRYPTED_CLIENT = ["/enc_weight_client1.txt",
+                    "/enc_weight_client2.txt",
+                    "/enc_weight_client3.txt",
+                    "/enc_weight_client4.txt"]
+
+KEYS = {"public_key" : None, "private_key" : None}
 
 def generate_keys():
-    pass
+    KEYS["public_key"], KEYS["private_key"] = paillier.generate_paillier_keypair()
 
 def encrypt_weights(weights, output_filename):
     """ This function will be used by clients to encrypt local model's weights and send its to server.
         - weights         : vector of model's weights (float numbers)
         - output_filename : store the output of encrypted_weights (as `Ciphertext<DCRTPoly>` object) to `output_filename`.
     """
-    encrypted_data[output_filename] = weights
-    encrypted_client.append(output_filename)
+    weights_div = [w / 4 for w in weights]
+    ENCRYPTED_DATA[output_filename] = Encrypt(weights_div, KEYS["public_key"])
 
-def decrypt_weights(cipher_file) -> list[float]:
+def decrypt_weights(cipher_file):
     """ This function will be used by clients to decrypt aggregated global model's weights.
         - cipher_file     : contain aggregated_weights compute using homomorphic operations by server
     """
     
-    return encrypted_data[cipher_file]
+    return ENCRYPTED_DATA[cipher_file].decrypt(KEYS["private_key"])
 
 def aggregator():
     """ This function will be used by server to calculate aggregated global model's weights by applying
         homomorphic encryption to encrypted local model's weights of clients
     """
-    total = encrypted_data[encrypted_client[0]]
-    for client in encrypted_client[1:]:
-        total = [sum(x) for x in zip(total, encrypted_data[client])]
-    total = [num / 4 for num in total]
-    encrypted_data["/enc_aggregator_weight_server.txt"] = total
+    total = ENCRYPTED_DATA[ENCRYPTED_CLIENT[0]]
+    for client in ENCRYPTED_CLIENT[1:]:
+        # total = [sum(x) for x in zip(total, ENCRYPTED_DATA[client])]
+        total += ENCRYPTED_DATA[client]
+    # total = [num / 4 for num in total]
+    ENCRYPTED_DATA["/enc_aggregator_weight_server.txt"] = total
 
 def demo():
     print("""
